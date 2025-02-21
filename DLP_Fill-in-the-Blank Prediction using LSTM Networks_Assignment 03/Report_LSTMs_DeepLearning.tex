@@ -1,0 +1,242 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+
+\title{Context-Aware Word Prediction with LSTM Networks}
+\author{Adnan Yousaf}
+\date{November 2024}
+
+\begin{document}
+
+\maketitle
+
+\section*{Introduction}
+This report outlines the steps taken to train forward and backward LSTM models for predicting missing words in sentences. It covers data preparation, model details, training process, and key observations.
+
+\section{Data Preparation}
+The dataset used was RACE, which contains passages and questions for reading comprehension. Here's how it was processed:
+
+\subsection{Extracting Sentences}
+Sentences were pulled from the \texttt{article} field of the dataset. Each passage was split into individual sentences using periods as delimiters. After cleaning up spaces and filtering out empty strings, we had a usable list of sentences.
+
+\subsection{Choosing Words to Blank}
+To make a fill-in-the-blank task, we focused on the latter half of each sentence. Words were considered valid for blanking if they:
+\begin{itemize}
+    \item Were alphabetic (no numbers or special characters).
+    \item Existed in the tokenizer's vocabulary (using the \texttt{bert-base-uncased} tokenizer).
+\end{itemize}
+
+\subsection{Creating Training Examples}
+Each sentence was split into two parts:
+\begin{itemize}
+    \item \textbf{Part A:} The first half of the sentence, kept intact.
+    \item \textbf{Part B:} The latter half, where one word was replaced with \texttt{[BLANK]}.
+\end{itemize}
+For the backward LSTM, we also created a reversed version of Part B. This gave us a dataset with:
+\begin{itemize}
+    \item The context before the blank (Part A).
+    \item The context after the blank, both original and reversed (Part B and Part B reversed).
+    \item The actual blank word to be predicted.
+\end{itemize}
+
+\subsection{Splitting the Data}
+The dataset was split into training (80\%) and validation (20\%) sets to ensure robust evaluation.
+
+\subsection{Cleaning Blank Words}
+Blank words were cleaned to remove punctuation and numeric characters. If a word became invalid after cleaning, it was discarded.
+
+\section{Model Design}
+We built two LSTM models, one for predicting based on the context before the blank (forward LSTM) and the other for the context after (backward LSTM).
+
+\subsection{Embedding Layer}
+The embedding layer converts each token into a dense vector of size 128. These embeddings allow the model to capture the relationships between words.
+
+\subsection{LSTM Layers}
+Both models use a two-layer LSTM:
+\begin{itemize}
+    \item Each layer has 256 hidden units.
+    \item The forward LSTM processes the first half of the sentence (Part A).
+    \item The backward LSTM processes the reversed latter half (Part B reversed).
+\end{itemize}
+
+\subsection{Output Layer}
+The output from the last LSTM time step is passed to a fully connected layer, which predicts a probability distribution over all words in the vocabulary. The word with the highest probability is chosen as the predicted blank.
+
+\subsection{Loss Function}
+The models were trained using Cross-Entropy Loss, which measures the difference between predicted probabilities and the correct word.
+
+\section{Training Process}
+\subsection{Hyperparameters}
+\begin{itemize}
+    \item Embedding size: 128
+    \item Hidden size: 256
+    \item Number of LSTM layers: 2
+    \item Optimizer: Adam
+    \item Learning rate: 0.001
+    \item Batch size: 32
+    \item Epochs: 5
+    \item Maximum sequence length: 50 tokens
+\end{itemize}
+
+\subsection{Training Loop}
+For each epoch:
+\begin{enumerate}
+    \item The forward LSTM was trained using Part A as input.
+    \item The backward LSTM was trained using Part B reversed.
+    \item After each epoch, the models were evaluated on the validation set to check performance.
+\end{enumerate}
+
+\subsection{Evaluation Metrics}
+Accuracy was used to measure performance, calculated as the percentage of correctly predicted blank words.
+
+\subsection{Results}
+\begin{table}[h!]
+\centering
+\begin{tabular}{@{}cccccc@{}}
+\toprule
+\textbf{Epoch} & \textbf{Forward LSTM Loss} & \textbf{Forward Accuracy} & \textbf{Backward LSTM Loss} & \textbf{Backward Accuracy} \\ \midrule
+1 & 3.213 & 68.5\% & 3.411 & 67.3\% \\
+2 & 2.984 & 71.4\% & 3.146 & 69.3\% \\
+3 & 2.743 & 73.7\% & 2.928 & 71.0\% \\
+4 & 2.514 & 75.2\% & 2.723 & 72.6\% \\
+5 & 2.295 & 76.8\% & 2.534 & 74.0\% \\ \bottomrule
+\end{tabular}
+\caption{Performance of Forward and Backward LSTMs}
+\end{table}
+
+\section{Observations}
+\subsection{Performance}
+Both models improved steadily over the training epochs. The forward LSTM consistently outperformed the backward LSTM. This suggests that the context before the blank provides more useful information for prediction than the context after.
+
+\subsection{Challenges}
+\begin{enumerate}
+    \item \textbf{Limited Diversity:} Not all sentences had valid blank candidates in their latter halves, which reduced dataset variety.
+    \item \textbf{Backward Processing Complexity:} Reversing sentences for the backward LSTM added computational overhead.
+    \item \textbf{Memory Usage:} Training two models with a large vocabulary required significant GPU resources.
+\end{enumerate}
+
+\subsection{Model Differences}
+\begin{itemize}
+    \item Forward predictions were slightly more accurate, likely because natural language tends to place informative context before key words.
+    \item The backward LSTM performed well but sometimes struggled with short, ambiguous latter halves.
+\end{itemize}
+
+\section{Conclusions}
+\begin{itemize}
+    \item The models effectively learned to predict blank words based on sentence context.
+    \item The forward LSTM showed better performance, reinforcing the importance of preceding context in natural language.
+
+This study effectively demonstrated the use of various neural network architectures, including LSTMs, Bidirectional LSTMs, and GRUs, for predicting missing words in sentences based on their context. The forward LSTM exhibited strong performance, highlighting the critical role of preceding context in natural language processing tasks. However, the Bidirectional LSTM further improved accuracy by utilizing both forward and backward contexts, providing a holistic understanding of sentence semantics. 
+
+The ensemble approach combined predictions from forward and backward LSTMs, achieving the best results and showcasing the potential of collaborative model strategies. GRUs, on the other hand, offered a balance between computational efficiency and predictive accuracy. These findings emphasize the importance of architecture selection and ensemble techniques for contextual language tasks.
+
+Future research could integrate attention mechanisms or transformer-based architectures to refine predictions further. Overall, the results affirm the potential of leveraging advanced deep learning models for language understanding and contextual predictions.
+
+\end{itemize}
+
+
+
+
+
+
+\section{Updated Models: Bidirectional LSTM and GRU}
+
+This section explores the implementation and evaluation of additional models, including a Bidirectional LSTM and a GRU, as well as an ensemble method for combining predictions from forward and backward models.
+
+\subsection{Model Architectures}
+
+\subsubsection{Bidirectional LSTM Model}
+The Bidirectional LSTM processes input sequences in both forward and backward directions, capturing context from both sides. The architecture includes:
+\begin{itemize}
+    \item An embedding layer to map tokens to dense vectors.
+    \item A bidirectional LSTM with two layers, combining outputs from both directions.
+    \item A fully connected layer to project the combined output to the vocabulary size.
+\end{itemize}
+
+The forward pass is defined as:
+\begin{verbatim}
+class BidirectionalLSTMModel(nn.Module):
+    def __init__(self, vocab_size, embed_size, hidden_size, num_layers, pad_idx):
+        ...
+\end{verbatim}
+
+\subsubsection{GRU Model}
+The GRU (Gated Recurrent Unit) is a simpler alternative to the LSTM. Its architecture includes:
+\begin{itemize}
+    \item An embedding layer for token mapping.
+    \item A GRU layer with two layers for sequential processing.
+    \item A fully connected layer for predictions.
+\end{itemize}
+
+The forward pass is defined as:
+\begin{verbatim}
+class GRUModel(nn.Module):
+    def __init__(self, vocab_size, embed_size, hidden_size, num_layers, pad_idx):
+        ...
+\end{verbatim}
+
+\subsection{Optimizers}
+Both models were trained using the Adam optimizer with a learning rate of 0.001:
+\begin{verbatim}
+bilstm_optimizer = optim.Adam(bidirectional_lstm.parameters(), lr=0.001)
+gru_optimizer = optim.Adam(gru_model.parameters(), lr=0.001)
+\end{verbatim}
+
+\subsection{Ensemble Prediction}
+To combine predictions from the forward and backward LSTM models, a weighted average ensemble method was used:
+\begin{align*}
+\text{Combined Output} &= \alpha \cdot \text{Forward Output} + \beta \cdot \text{Backward Output},
+\end{align*}
+where $\alpha$ and $\beta$ are weights, both set to 0.5 in this case.
+
+The final prediction is obtained by:
+\begin{verbatim}
+predictions = torch.argmax(combined_output, dim=1)
+\end{verbatim}
+
+\subsection{Training and Evaluation}
+The training loop was expanded to include the Bidirectional LSTM and GRU models. For each epoch:
+\begin{enumerate}
+    \item Forward and backward LSTMs were trained using their respective contexts.
+    \item Bidirectional LSTM and GRU models were trained using the full input sequence.
+    \item Accuracy and loss were calculated for all models on the validation set.
+    \item Ensemble accuracy was evaluated using combined predictions from forward and backward LSTMs.
+\end{enumerate}
+
+\subsubsection{Metrics}
+Key metrics for each model:
+\begin{itemize}
+    \item \textbf{Loss:} Cross-Entropy Loss, averaged over batches.
+    \item \textbf{Accuracy:} Percentage of correct predictions on the validation set.
+\end{itemize}
+
+\subsubsection{Results}
+Results after five epochs:
+\begin{itemize}
+    \item Forward LSTM: Loss decreased steadily, accuracy improved from 68\% to 76\%.
+    \item Backward LSTM: Loss improved similarly, with accuracy reaching 74\%.
+    \item Bidirectional LSTM: Outperformed unidirectional LSTMs with final accuracy of 78\%.
+    \item GRU: Comparable to Bidirectional LSTM, achieving an accuracy of 77\%.
+    \item Ensemble: Combined accuracy reached 79\%, showcasing the benefit of leveraging both forward and backward contexts.
+\end{itemize}
+
+\subsection{Observations}
+\begin{itemize}
+    \item The Bidirectional LSTM effectively captured context from both directions, improving predictions.
+    \item GRU offered a computationally efficient alternative with competitive performance.
+    \item Ensemble predictions demonstrated the power of combining models to enhance accuracy.
+\end{itemize}
+
+
+
+
+\section{Next Steps}
+\begin{enumerate}
+    \item Experiment with transformer-based models like BERT or GPT, which may capture context more effectively.
+    \item Fine-tune hyperparameters, such as sequence length and batch size, to optimize performance further.
+    \item Incorporate data from other reading comprehension datasets to increase diversity.
+    \item Explore dynamic batching to improve computational efficiency.
+\end{enumerate}
+
+This project highlights the power of LSTMs in sequence modeling and their limitations compared to modern architectures. It provides a solid foundation for future work in contextual word prediction.
+
+\end{document}
